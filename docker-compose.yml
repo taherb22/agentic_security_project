@@ -1,0 +1,26 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyber-agent
+    env_file:
+      - .env
+    volumes:
+      - chroma_data:/app/chroma_data
+    ports:
+      - "8000:8000"
+
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyber-etl
+    command: ["python", "ingest.py"]
+    depends_on:
+      - agent
+    env_file:
+      - .env
+
+volumes:
+  chroma_data:

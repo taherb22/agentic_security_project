@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "cyber-agent"
+version = "0.1.0"
+description = "LLM + RAG Cybersecurity Agent with Groq and ChromaDB"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.29.0" }
+
+groq = "^0.9.0"
+chromadb = "^0.5.0"
+sentence-transformers = "^3.0.0"
+pydantic = "^2.9.0"
+requests = "^2.32.0"
+datasets = "^3.0.0"
+
+# Optional — for performance
+numpy = "^2.1.0"
+scikit-learn = "^1.5.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+ruff = "^0.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
