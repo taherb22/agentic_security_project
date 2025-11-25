@@ -3,7 +3,7 @@ FROM python:3.11-slim AS base
 
 # Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential git \
+    build-essential git curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry

@@ -13,7 +13,8 @@ import argparse
 # -----------------------------------------------
 # Configuration
 # -----------------------------------------------
-API_URL = "http://localhost:8000/ingest"   # your FastAPI endpoint
+API_URL = "http://agent:8000/ingest"
+ # your FastAPI endpoint
 BATCH_SIZE = 100                           # number of records per API call
 VERIFY_SSL = True                          # set False if using self-signed SSL
 

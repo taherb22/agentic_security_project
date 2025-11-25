@@ -10,6 +10,12 @@ services:
       - chroma_data:/app/chroma_data
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   etl:
     build:
@@ -18,7 +24,8 @@ services:
     container_name: cyber-etl
     command: ["python", "ingest.py"]
     depends_on:
-      - agent
+      agent:
+        condition: service_healthy
     env_file:
       - .env
 
