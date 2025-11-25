@@ -5,7 +5,16 @@ from datasets import load_dataset
 import argparse
 
 API_URL = "http://agent:8000/ingest"
+from chromadb import PersistentClient
 
+client = PersistentClient(path="/app/chroma_data")
+collection = client.get_or_create_collection("cyber_events")
+
+# --- SKIP LOGIC ---
+count = collection.count()
+if count > 0:
+    print(f"[ETL] Existing data found ({count} vectors). Skipping ingestion.")
+    exit(0)
 
 # -----------------------------------------
 # Normalize function (same as before)

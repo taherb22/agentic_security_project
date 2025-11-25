@@ -117,7 +117,7 @@ Return only valid JSON.
 
     try:
         resp = groq_client.chat.completions.create(
-            model="mixtral-8x7b-32768",
+            model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": "Always output valid JSON, no explanations."},
                 {"role": "user", "content": prompt}
@@ -125,7 +125,7 @@ Return only valid JSON.
             temperature=0.0
         )
 
-        raw = resp.choices[0].message.content.strip()
+        raw = resp.choices[0].message.content.strip()   
 
         return json.loads(raw)
 
@@ -139,7 +139,7 @@ def groq_report_stream(prompt: str):
     """
     try:
         stream = groq_client.chat.completions.create(
-            model="mixtral-8x7b-32768",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_completion_tokens=2048,
             stream=True
