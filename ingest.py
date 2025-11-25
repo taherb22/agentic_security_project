@@ -67,10 +67,10 @@ async def run_ingestion(dataset_name, split, batch_size):
         if batch:
             tasks.append(asyncio.create_task(send_batch(session, batch)))
 
-        print("⏳ Waiting for all batches to complete...")
+        print("Waiting for all batches to complete...")
         await asyncio.gather(*tasks)
 
-    print("🎉 Ingestion complete!")
+    print(" Ingestion complete!")
 
 
 if __name__ == "__main__":

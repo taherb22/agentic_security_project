@@ -157,29 +157,40 @@ def groq_report_stream(prompt: str):
 # Endpoints
 # ------------------------------------------------------
 
+from fastapi import BackgroundTasks
+
 @app.post("/ingest")
-async def ingest_logs(payload: IngestRequest):
+async def ingest_logs(payload: IngestRequest, background: BackgroundTasks):
     if not model or not collection:
         raise HTTPException(status_code=503, detail="Vector DB not initialized")
 
-    try:
-        ids = [str(uuid.uuid4()) for _ in payload.texts]
-        embeddings = model.encode(payload.texts).tolist()
+    # Schedule ingestion in background
+    background.add_task(process_batch, payload.texts)
 
+    return {"status": "queued", "count": len(payload.texts)}
+
+
+def process_batch(texts):
+    try:
+        ids = [str(uuid.uuid4()) for _ in texts]
+
+        # Run embedding in a dedicated CPU thread
+        embeddings = model.encode(texts).tolist()
+
+        # Write to Chroma (blocking, so kept off the event loop)
         collection.add(
             ids=ids,
             embeddings=embeddings,
-            documents=payload.texts
+            documents=texts
         )
 
-        if hasattr(chroma_client, 'persist'):
+        if hasattr(chroma_client, "persist"):
             chroma_client.persist()
 
-        return {"status": "success", "count": len(ids)}
+        logger.info(f"Ingested {len(texts)} logs")
 
     except Exception as e:
-        logger.error(f"Ingest failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Batch processing failed: {e}")
 
 
 @app.post("/agent/analyze")
