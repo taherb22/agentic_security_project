@@ -1,43 +1,16 @@
 #!/usr/bin/env python3
-"""
-ingest.py – Load a SIEM dataset from HuggingFace and ingest it into your FastAPI backend.
-"""
-
-import requests
+import asyncio
+import aiohttp
 from datasets import load_dataset
-import time
-import json
 import argparse
 
-
-# -----------------------------------------------
-# Configuration
-# -----------------------------------------------
 API_URL = "http://agent:8000/ingest"
- # your FastAPI endpoint
-BATCH_SIZE = 100                           # number of records per API call
-VERIFY_SSL = True                          # set False if using self-signed SSL
 
 
-# -----------------------------------------------
-# Function: Load dataset from HuggingFace
-# -----------------------------------------------
-def load_siem_dataset(name="darkknight25/Advanced_SIEM_Dataset", split="train"):
-    print(f" Loading dataset: {name} ({split}) ...")
-    ds = load_dataset(name, split=split)
-    print(f" Loaded {len(ds)} records.")
-    return ds
-
-
-# -----------------------------------------------
-# Function: Convert dataset record → text blob
-# This is what will be embedded and stored in Chroma.
-# -----------------------------------------------
+# -----------------------------------------
+# Normalize function (same as before)
+# -----------------------------------------
 def normalize_record(row):
-    """
-    Build a clean, human-readable text representation of the log.
-    This text is what FastAPI will send to Chroma for embedding.
-    """
     text = (
         f"Event ID: {row.get('event_id')}\n"
         f"Timestamp: {row.get('timestamp')}\n"
@@ -46,79 +19,65 @@ def normalize_record(row):
         f"Description: {row.get('description')}\n"
         f"Raw Log: {row.get('raw_log')}\n"
     )
-
-    # Include metadata if exists
     if "advanced_metadata" in row and isinstance(row["advanced_metadata"], dict):
-        meta = row["advanced_metadata"]
-        for k, v in meta.items():
+        for k, v in row["advanced_metadata"].items():
             text += f"{k}: {v}\n"
-
     return text
 
 
-# -----------------------------------------------
-# Function: Send batch to FastAPI
-# -----------------------------------------------
-def send_batch(batch):
+# -----------------------------------------
+# Async batch sender
+# -----------------------------------------
+async def send_batch(session, batch):
     try:
-        payload = {"texts": batch}
-        response = requests.post(API_URL, json=payload, verify=VERIFY_SSL)
-
-        if response.status_code == 200:
-            print(f" Successfully ingested {len(batch)} records.")
-        else:
-            print(f" Error {response.status_code}: {response.text}")
-
+        async with session.post(API_URL, json={"texts": batch}) as resp:
+            if resp.status == 200:
+                print(f" Ingested {len(batch)} records")
+            else:
+                print(f" Error {resp.status}: {await resp.text()}")
     except Exception as e:
-        print(f"Exception sending batch: {e}")
+        print(f" Exception sending batch: {e}")
 
 
-# -----------------------------------------------
-# Main ETL Process
-# -----------------------------------------------
-def run_ingestion(dataset_name, split):
-    ds = load_siem_dataset(dataset_name, split)
-
-    batch = []
+# -----------------------------------------
+# Main async ETL
+# -----------------------------------------
+async def run_ingestion(dataset_name, split, batch_size):
+    ds = load_dataset(dataset_name, split=split)
     total = len(ds)
+    print(f"Loaded {total} records")
 
-    print(" Starting ingestion...")
+    tasks = []
+    connector = aiohttp.TCPConnector(limit=50)  # up to 50 parallel requests
+    async with aiohttp.ClientSession(connector=connector) as session:
 
-    for i, row in enumerate(ds):
+        batch = []
+        for i, row in enumerate(ds):
+            batch.append(normalize_record(row))
 
-        text = normalize_record(row)
-        batch.append(text)
+            if len(batch) == batch_size:
+                tasks.append(asyncio.create_task(send_batch(session, batch)))
+                batch = []
 
-        # If batch full → send
-        if len(batch) == BATCH_SIZE:
-            send_batch(batch)
-            batch = []
-            time.sleep(0.1)   # avoid spamming API
+                # Optional: print progress every 5k
+                if (i + 1) % 5000 == 0:
+                    print(f"Progress: {i+1}/{total}")
 
-        # Progress display
-        if (i + 1) % 1000 == 0:
-            print(f"Progress: {i+1}/{total}")
+        # send remaining batch
+        if batch:
+            tasks.append(asyncio.create_task(send_batch(session, batch)))
 
-    # Send final partial batch
-    if batch:
-        send_batch(batch)
+        print("⏳ Waiting for all batches to complete...")
+        await asyncio.gather(*tasks)
 
-    print(" Ingestion complete!")
+    print("🎉 Ingestion complete!")
 
 
-# -----------------------------------------------
-# CLI Arguments
-# -----------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest SIEM dataset into FastAPI.")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="darkknight25/Advanced_SIEM_Dataset")
     parser.add_argument("--split", default="train")
-    parser.add_argument("--batch", default=100, type=int)
-    parser.add_argument("--api", default=API_URL)
-
+    parser.add_argument("--batch", type=int, default=1000)
     args = parser.parse_args()
 
-    BATCH_SIZE = args.batch
-    API_URL = args.api
-
-    run_ingestion(args.dataset, args.split)
+    asyncio.run(run_ingestion(args.dataset, args.split, args.batch))
