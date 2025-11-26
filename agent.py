@@ -141,7 +141,7 @@ def groq_report_stream(prompt: str):
         stream = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=2048,
+            max_tokens=2000,
             stream=True
         )
 
